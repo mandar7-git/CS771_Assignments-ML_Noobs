@@ -32,8 +32,9 @@ def get_renamed_labels( y ):
 	# For example, you may map 1 -> 1 and 0 -> -1 or else you may want to go with 1 -> -1 and 0 -> 1
 	# Use whatever convention you seem fit but use the same mapping throughout your code
 	# If you use one mapping for train and another for test, you will get poor accuracy
-	
-	return y_new.reshape( ( y_new.size, ) )					# Reshape y_new as a vector
+	mapping = lambda t: 2*t-1
+	y_new = mapping(y)
+	return y_new.reshape( ( y_new.size,) )					# Reshape y_new as a vector
 
 
 ################################
@@ -51,7 +52,10 @@ def get_features( X ):
 	# features can be 2 dimensional, 10 dimensional, 1000 dimensional, 123456 dimensional etc
 	# Keep in mind that the more dimensions you use, the slower will be your solver too
 	# so use only as many dimensions as are absolutely required to solve the problem
-	
+	X_new = np.cumprod( np.flip(2 * X - 1 , axis = 1), axis=1)
+	ones = np.ones((X.shape[0],1))
+	X1=np.append(X_new,ones,axis=1)
+	X_new=(khatri_rao(X1.T,khatri_rao(X1.T,X1.T))).T
 	return X_new
 
 
@@ -83,6 +87,16 @@ def solver( X, y, timeout, spacing ):
 
 	# You may reinitialize W, B to your liking here e.g. set W to its correct dimensionality
 	# You may also define new variables here e.g. step_length, mini-batch size etc
+	step_length = 1e-2
+	X = get_features(X)
+	y = get_renamed_labels(y)
+	# print(X.shape)#(n,729)
+	# print(y.shape)#(n,)
+	C = 1
+	d = X.shape[1]
+	init = np.zeros( (d+1,) )
+	theta=init
+	W=init
 
 ################################
 # Non Editable Region Starting #
@@ -118,5 +132,18 @@ def solver( X, y, timeout, spacing ):
 		# This way, W, B will always store the averages and can be returned at any time
 		# In this scheme, W, B play the role of the "cumulative" variables in the course module optLib (see the cs771 library)
 		# W_run, B_run on the other hand, play the role of the "theta" variable in the course module optLib (see the cs771 library)
+		W_run = theta[0:-1]
+		B_run = theta[-1]
+		discriminant = np.multiply( (X.dot(W_run) + B_run),y)
+		g = np.zeros( (y.size,) )
+		g[discriminant < 1] = -1
+		delb = C * g.dot(y)
+		delw = W_run + C * (X.T * g).dot(y)
+		delta = np.append(delw,delb)
+		theta = theta - (step_length/(t+1)) * delta
+		W = theta[0:-1]
 		
+
+
+
 	return ( W.reshape( ( W.size, ) ), B, totTime )			# This return statement will never be reached
